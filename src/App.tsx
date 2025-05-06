@@ -15,9 +15,10 @@ type Pet = {
 
 export default function PetStore() {
   const [pets, setPets] = useState<Pet[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [newPet, setNewPet] = useState<Omit<Pet, 'id'>>({
     name: '',
@@ -42,7 +43,6 @@ export default function PetStore() {
         setLoading(false);
       }
     };
-
     fetchPets();
   }, []);
 
@@ -54,11 +54,21 @@ export default function PetStore() {
     }));
   };
 
-  const handleAddPet = async (e: React.FormEvent) => {
+  const handleAddOrUpdatePet = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8080/david/pets', newPet);
-      setPets([...pets, response.data]);
+      if (editingId !== null) {
+        const response = await axios.put(`http://localhost:8080/david/pets/${editingId}`, {
+          id: editingId,
+          ...newPet,
+        });
+        setPets(pets.map(p => (p.id === editingId ? response.data : p)));
+        setEditingId(null);
+      } else {
+        const response = await axios.post('http://localhost:8080/david/pets', newPet);
+        setPets([...pets, response.data]);
+      }
+
       setNewPet({
         name: '',
         species: '',
@@ -69,7 +79,7 @@ export default function PetStore() {
         price: 0,
       });
     } catch (error) {
-      console.error('Error adding pet', error);
+      console.error('Error saving pet', error);
     }
   };
 
@@ -77,13 +87,37 @@ export default function PetStore() {
     try {
       await axios.delete(`http://localhost:8080/david/pets/${id}`);
       setPets(pets.filter(pet => pet.id !== id));
+      if (editingId === id) {
+        setEditingId(null);
+        setNewPet({
+          name: '',
+          species: '',
+          breed: '',
+          gender: '',
+          image: '',
+          description: '',
+          price: 0,
+        });
+      }
     } catch (error) {
       console.error('Error deleting pet', error);
     }
   };
 
-  const handleEditPet = async (id: number) => {
-    alert(`Edit functionality for pet with ID: ${id} is not yet implemented.`);
+  const handleEditPet = (id: number) => {
+    const petToEdit = pets.find(pet => pet.id === id);
+    if (petToEdit) {
+      setEditingId(id);
+      setNewPet({
+        name: petToEdit.name,
+        species: petToEdit.species,
+        breed: petToEdit.breed,
+        gender: petToEdit.gender,
+        image: petToEdit.image,
+        description: petToEdit.description,
+        price: petToEdit.price,
+      });
+    }
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,7 +134,7 @@ export default function PetStore() {
 
   return (
     <div className="container">
-      <h1>Pet Store</h1>
+      <h1>Tindahan ng Hayop Ya</h1>
 
       <div className="search-bar">
         <input
@@ -118,7 +152,7 @@ export default function PetStore() {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: '200px', // Adjust as needed
+          minHeight: '200px',
           fontSize: '1.5em',
           fontWeight: 'bold',
           color: 'red',
@@ -145,8 +179,8 @@ export default function PetStore() {
       )}
 
       <div className="add-pet-form">
-        <h2>Add a Pet</h2>
-        <form onSubmit={handleAddPet}>
+        <h2>{editingId !== null ? 'Edit Pet' : 'Add a Pet'}</h2>
+        <form onSubmit={handleAddOrUpdatePet}>
           <input name="name" placeholder="Name" value={newPet.name} onChange={handleInputChange} required />
           <input name="species" placeholder="Species" value={newPet.species} onChange={handleInputChange} required />
           <input name="breed" placeholder="Breed" value={newPet.breed} onChange={handleInputChange} required />
@@ -154,7 +188,7 @@ export default function PetStore() {
           <input name="image" placeholder="Image URL" value={newPet.image} onChange={handleInputChange} required />
           <textarea name="description" placeholder="Description" value={newPet.description} onChange={handleInputChange} required />
           <input name="price" type="number" placeholder="Price" value={newPet.price} onChange={handleInputChange} required />
-          <button type="submit">Add Pet</button>
+          <button type="submit">{editingId !== null ? 'Update Pet' : 'Add Pet'}</button>
         </form>
       </div>
     </div>
